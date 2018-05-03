@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ggs</title>
+  <link rel="stylesheet" type="text/css" href="style.css">
+</head>
+<body>
+<article id="main">
+  <header>
+    <h1></h1>
+  </header>
+  <canvas id="canvas"></canvas>
+  <footer>
+  </footer>
+</article>
+<script src="js/sprite.js"></script>
+<script src="js/resources.js"></script>
+<script>
+var requestAnimFrame = (function(){
+    return window.requestAnimationFrame    ||
+        window.webkitRequestAnimationFrame ||
+        window.mozRequestAnimationFrame    ||
+        window.oRequestAnimationFrame      ||
+        window.msRequestAnimationFrame
+})();
+//
+// Varibles
+//
+var canvas = document.getElementById("canvas");
+    ctx = canvas.getContext("2d");
+    tile = 64;
+    monsters = [];
+    cells = [];
+    tilelayers = [];
+//
+// All for map
+//
+    MAP = {
+      cell: function(cell) { //position on canvas
+        return {
+          x: cell % 14 * tile,
+          y: ((cell / 14) | 0) * tile,
+          w: tile,
+          h: tile,
+          r: (cell / 14) | 0,
+          c: cell % 14
+        }
+      },
+      tile: function(tile) { //position on tileset
+        return {
+          x: ((tile - 1) % 9) * tile,
+          y: (((tile - 1) / 9) | 0) * tile,
+          r: ((tile - 1) / 9) | 0,
+          c: (tile - 1) % 9
+        }
+      },
+      Foreground: [],
+      Background: [],
+      Collision: []
+    }
+
+
+function overlap(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x &&
+         a.y < b.y + b.h && a.y + a.h > b.y
+}
+
+var img = new Image();
+img.src = 'img.png';
+
+
+var keys = [];
+
+
+var lastTime;
+
+function main() {
+    var now = Date.now();
+    var dt = (now - lastTime) / 1000.0;
+
+    update(dt);
+    render();
+
+    lastTime = now;
+    requestAnimFrame(main);
+}
+
+function setup(map) {
+  canvas.width = map.width * tile;
+  canvas.height = map.height *tile;
+  //resize canvas
+  var layers = map.layers, object;
+  //prepare the map
+  for(n = 0; n < layers.length; n++) {
+    layer = layers[n];
+    switch(layer.name) {
+      //layers
+      case "Wall": MAP.Wall = layer.data; break;
+      case "Background": MAP.Background = layer.data; break;
+      case "Foreground": MAP.Foreground = layer.data; break;
+      case "Collision": MAP.Collision = layer.data; break;
+      //objects
+      case "Objects":
+        for(n = 0; n < layer.objects.length; n++) {
+          object = layer.objects[n];
+          entity = setupEntity(object);
+          switch(object.type) {
+            case "player": player = entity; break;
+            case "monster": monsters.push(entity); break;
+          }
+        }
+        break;
+    }
+  }
+  console.log(map);
+}
+
+function setupEntity(object) {
+  var entity = {
+    x: object.x,
+    y: object.y,
+    w: object.width,
+    h: object.height,
+    velocity: {
+      x: 0,
+      y: 0
+    },
+    speed: 170,
+    onFloor: false,
+    face: "right",
+    behavior: "idle",
+    sprite: {
+      jump: {
+        "right": new Sprite('img/player.png', [0, 64], [64, 64], 6, [0], (!!keys[68] - !!keys[65])),
+        "left": new Sprite('img/player.png', [0, 64], [64, 64], 6, [0], (!!keys[68] - !!keys[65]))
+      },
+      walk: {
+        "right": new Sprite('img/player.png', [0, 0], [64, 64], 6, [0, 1, 2, 1], (!!keys[68] - !!keys[65])),
+        "left": new Sprite('img/player.png', [0, 0], [64, 64], 6, [0, 1, 2, 1], (!!keys[68] - !!keys[65]))
+      },
+      idle: {
+        "right": new Sprite('img/player.png', [0, 64], [64, 64], 6, [1], (!!keys[68] - !!keys[65])),
+        "left": new Sprite('img/player.png', [0, 64], [64, 64], 6, [1], (!!keys[68] - !!keys[65]))
+      }
+    }
+  }
+  return entity;
+}
+
+function updateEntity(entity, dt) {
+  entity.sprite[entity.behavior][entity.face].update(dt);
+
+  entity.velocity.y += 0.4;
+
+  var expectedY = entity.y + entity.velocity.y;
+
+
+  for (var i = 0; i < MAP.Collision.length; i++) {
+    var cell = MAP.cell(i);
+
+    if(MAP.Collision[i] != 0) {
+
+      var temp = {
+        x: (entity.x + entity.w * 0.1875) + entity.velocity.x,
+        y: entity.y,
+        w: entity.w * 0.625,
+        h: entity.h
+      }
+      if(overlap(temp, cell)) {
+        if(entity.velocity.x > 0) {
+          entity.velocity.x = cell.x - (entity.x + entity.w * 0.1875) - (entity.w * 0.625);
+
+        }
+        else if(entity.velocity.x < 0) {
+          entity.velocity.x = cell.x + cell.w - (entity.x + entity.w * 0.1875);
+        }
+      }
+
+      var temp = {
+        x: entity.x + entity.w * 0.1875,
+        y: entity.y + entity.velocity.y,
+        w: entity.w * 0.625,
+        h: entity.h
+      }
+      
+      if(overlap(temp, cell)) {
+        if(entity.velocity.y > 0) {
+          entity.velocity.y = cell.y - entity.y - entity.h;
+        }
+        else if(entity.velocity.y < 0) {
+          entity.velocity.y = cell.y + cell.h - entity.y;
+        }
+      }
+    }
+
+  }
+
+  entity.x += entity.velocity.x;
+  entity.y += entity.velocity.y;
+
+  player.onFloor = (expectedY > player.y)
+  if (expectedY != player.y) player.velocity.y = 0
+}
+
+//
+// Map render
+//
+function renderLayer(layer) {
+  for(n = 0; n < MAP[layer].length; n++) {
+    ctx.drawImage(
+          resources.get('img/tileset.png'),
+          MAP.tile(MAP[layer][n]).c * tile, MAP.tile(MAP[layer][n]).r * tile,
+          tile, tile,
+          MAP.cell(n).x, MAP.cell(n).y,
+          tile, tile
+    );
+  }
+}
+
+function init() {
+  lastTime = Date.now();
+  main();
+}
+
+function update(dt) {
+
+
+  if((keys[87] || keys[83] || keys[68] || keys[65]) && player.onFloor) player.behavior = "walk";
+
+  if(!keys[87] && !keys[83] && !keys[68] && !keys[65] && !keys[32]) player.behavior = "idle";
+
+  if(player.onFloor && keys[32]) {
+    player.velocity.y = -11;
+    player.behavior = "jump";
+  }
+
+  if(keys[68]) {
+    player.face = "right";
+  }
+  if(keys[65]) {
+    player.face = "left";
+  }
+  player.velocity.x = 3 * (!!keys[68] - !!keys[65]);
+
+  updateEntities(dt);
+
+  var a = 'test'
+
+  console.log();
+  
+}
+
+function updateEntities(dt) {
+  updateEntity(player, dt);
+}
+
+// RENDERING //
+
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  renderLayer("Foreground");
+  
+  renderPlayer();
+  renderMonsters();
+  
+  renderLayer("Background");
+  renderLayer("Collision");
+  renderLayer("Wall");
+
+  //ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+  //ctx.fillRect(player.x + player.w * 0.1875, player.y, player.w * 0.625, player.h);
+};
+
+function renderEntity(entity) {
+  ctx.save();
+
+  ctx.translate(entity.x, entity.y);
+  entity.sprite[entity.behavior][entity.face].render(ctx);
+
+  ctx.restore();
+
+  if(player.damage) {
+    ctx.globalCompositeOperation = "source-atop";
+
+    ctx.fillStyle = "rgba(255, 0, 0, 0)";
+    ctx.fillRect(player.x, player.y, 64, 64);
+  }
+
+  ctx.globalCompositeOperation = "destination-over";
+}
+function renderPlayer() {
+  renderEntity(player);
+}
+function renderMonsters() {
+  for(n = 0; n < monsters.length; n++) {
+    renderEntity(monsters[n]);
+  }
+}
+
+
+
+get('map.json', function(req) {
+  setup(JSON.parse(req.responseText));
+});
+
+resources.load([
+  'img/player.png',
+  'img/tileset.png'
+]);
+
+resources.onReady(init);
+
+addEventListener("keydown", function(event) {
+  
+  keys[event.keyCode] = true;
+  
+});
+
+addEventListener("keyup", function(event) {
+  keys[event.keyCode] = false;
+
+  player.sprite[player.behavior][player.face]._index = 0
+  
+});
+
+function get(url, onsuccess) {
+  var request = new XMLHttpRequest();
+  request.onreadystatechange = function() {
+    if(request.readyState == 4 && request.status == 200) {
+      onsuccess(request);
+    }
+  }
+  request.open("GET", url, true);
+  request.send();
+}
+</script>
+</body>
+</html>

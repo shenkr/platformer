@@ -1,0 +1,77 @@
+<canvas id="main" width="1024" height="640">
+<script type="text/javascript">
+(function() {
+  var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame ||
+                              window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
+  window.requestAnimationFrame = requestAnimationFrame;
+})();
+
+// Game Varibles
+var cells = [];
+//
+
+var tilesetImage = new Image();
+tilesetImage.src = 'tile.png';
+
+
+var canvas = document.getElementById('main');
+var ctx = canvas.getContext('2d');
+var tileSize = 32; // The size of a tile (32x32)
+var rowTileCount = 4; // The number of tiles in a row of our background
+var colTileCount = 6; // The number of tiles in a column of our background
+var imageNumTiles = 3; // The number of tiles per row in the tileset image
+
+
+//var data = [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 0, 0, 1, 1, 1, 2, 0, 0, 0, 0, 0, 0, 0];
+
+
+function get(url, onsuccess) {
+  var request = new XMLHttpRequest();
+  request.onreadystatechange = function() {
+    if(request.readyState == 4 && request.status == 200) {
+      onsuccess(request);
+    }
+  }
+  request.open('GET', url, true);
+  request.send();
+}
+
+get('map.json', function(req) {
+  setup(JSON.parse(req.responseText));
+});
+var map1;
+
+
+
+function setup(map) {
+  cells = map.layers[0].data;
+  console.log(map);
+}
+
+function renderMap() {
+
+}
+/*
+function drawImage() {
+for(i = 0; i < data.length; i+=colTileCount) {
+  for(j = 0; j < colTileCount; j++) {
+    var r = (i / colTileCount) | 0;
+    var tile = data[r * colTileCount + j];
+
+    var tileRow = (tile / imageNumTiles) | 0;
+    var tileCol = (tile % imageNumTiles) | 0;
+
+    ctx.drawImage(
+      tilesetImage,
+      tileCol * tileSize, tileRow * tileSize,
+      tileSize, tileSize,
+      j * tileSize, r * tileSize,
+      tileSize, tileSize);
+
+  }
+}
+ 
+  ctx.restore();
+}
+*/
+</script>
